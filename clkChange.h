@@ -3,7 +3,7 @@
 
 #include <xc.h>
 
-// Function declarations
+// Function declarations 
 void newClk(unsigned int clkval);
 
 #endif // CHANGECLK_H

@@ -1,7 +1,7 @@
 /*
  * File:   uart.c
  * Author: psbta
- *
+ * 
  * Created on October 10, 2023, 4:10 PM
  */
 
