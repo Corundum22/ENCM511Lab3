@@ -12,6 +12,7 @@
 
 uint8_t received_char = 0;
 uint8_t RXFlag = 0;
+extern uint16_t var_x;
 // extern uint16_t CNflag; // uncomment if CNflag is implemented to break out of the busy wait for new input
 
 void InitUART2(void) 
@@ -84,6 +85,8 @@ void Disp2String(char *str) //Displays String of characters
     {
         XmitUART2(str[i],1);
     }
+    XmitUART2('\n', 1);
+    XmitUART2('\b', strlen(str));
 
     return;
 }
@@ -192,7 +195,23 @@ void __attribute__ ((interrupt, no_auto_psv)) _U2RXInterrupt(void) {
 
 	IFS1bits.U2RXIF = 0;
     
+    U2STAbits.UTXEN = 1;
+    while(U2STAbits.UTXBF==1);
+    U2TXREG='\b';
+	while(U2STAbits.TRMT==0);
+    
     received_char = U2RXREG;
+    
+    if (received_char == '0') var_x = 250;
+    else if (received_char == '1') var_x = 500;
+    else if (received_char == '2') var_x = 1000;
+    
+    U2STAbits.UTXEN = 1;
+    while(U2STAbits.UTXBF==1);
+    U2TXREG=received_char;
+	while(U2STAbits.TRMT==0);
+
+    U2STAbits.UTXEN = 0;
     
     RXFlag = 1;
     

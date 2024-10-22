@@ -54,6 +54,7 @@
 
 #include "clkChange.h"
 #include "uart.h"
+#include "functions.h"
 
 #define TESTSEND
 
@@ -69,12 +70,10 @@ enum states {
     FASTMODE_COMB12 = 0b10100,
     FASTMODE_COMB13 = 0b10101,
     FASTMODE_COMB23 = 0b10111,
-    FASTMODE_COMB123 = 0b11000,
-    PROGMODE = 0b00000,
-    PROGMODE_PB1 = 0b00001,
-    PROGMODE_PB2 = 0b00010,
-    PROGMODE_PB3 = 0b00011,
-    PROGMODE_COMB123 = 0b00100,
+    PROGMODE = 0b100000,
+    PROGMODE_PB1 = 0b100001,
+    PROGMODE_PB2 = 0b100010,
+    PROGMODE_PB3 = 0b100011,
 };
 
 enum states last_state = FASTMODE;
@@ -88,60 +87,8 @@ uint8_t received;
 uint16_t blink_rate = 250;
 uint16_t delay_count = 0;
 uint8_t PB_event;
-uint8_t stay_on;
+uint8_t stay_on = 0;
 uint16_t var_x = 250;
-
-void CNinit() {
-    PB_event = 0;
-    
-    IPC4bits.CNIP = 6;
-    IFS1bits.CNIF = 0;
-    IEC1bits.CNIE = 1;
-}
-
-void IOinit() {
-    TRISBbits.TRISB8 = 0;
-    
-    TRISAbits.TRISA4 = 1;
-    CNPU1bits.CN0PUE = 1;
-    CNEN1bits.CN0IE = 1;
-    
-    TRISBbits.TRISB4 = 1;
-    CNPU1bits.CN1PUE = 1;
-    CNEN1bits.CN1IE = 1;
-    
-    TRISAbits.TRISA2 = 1;
-    CNPU2bits.CN30PUE = 1;
-    CNEN2bits.CN30IE = 1;
-}
-
-void delay_ms(uint16_t ms_count) {
-    TMR2 = 0;
-    delay_count = 0;
-    T2CONbits.TON = 1;
-    
-    while (delay_count < ms_count) {
-        if (PB_event) {
-            PB_event = 0;
-            break;
-        }
-        Idle();
-    }
-    
-    T2CONbits.TON = 0;
-}
-
-void led_on() {
-    LATBbits.LATB8 = 1;
-}
-
-void led_off() {
-    LATBbits.LATB8 = 0;
-}
-
-void led_toggle() {
-    LATBbits.LATB8 ^= 1;
-}
 
 int main(void) {
     
@@ -162,76 +109,7 @@ int main(void) {
     
     led_off();
     
-    while(1) {
-        
-    
-        stay_on = 0;
-        blink_rate = 0;
-        switch (current_state) {
-            case FASTMODE: blink_rate = 0; Disp2String("FASTMODE "); break;
-            case FASTMODE_PB1: blink_rate = 250; Disp2String("FASTMODE_PB1 "); break;
-            case FASTMODE_PB2: blink_rate = 500; Disp2String("FASTMODE_PB2 "); break;
-            case FASTMODE_PB3: blink_rate = 1000; Disp2String("FASTMODE_PB3 "); break;
-            case FASTMODE_COMB12: stay_on = 1; break;
-            case FASTMODE_COMB13: stay_on = 1; break;
-            case FASTMODE_COMB23: stay_on = 1; break;
-            case FASTMODE_COMB123: current_state = PROGMODE_COMB123; break;
-            case PROGMODE: blink_rate = 0; break;
-            case PROGMODE_PB1: blink_rate = 3000; break;
-            case PROGMODE_PB2: blink_rate = var_x; break;
-            case PROGMODE_PB3: blink_rate = 125; break;
-            case PROGMODE_COMB123: current_state = FASTMODE_COMB123; break;
-            default: current_state = FASTMODE;
-        }
-        
-        /*
-         * enter this loop only if blink_rate == 0 due to the state machine
-         */
-        if (blink_rate == 0) {
-            //Disp2String("Entered blink_rate == 0; ");
-            led_off();
-            Idle();
-            //Disp2String("Left blink_rate == 0; ");
-        }
-        if (stay_on) {
-            //Disp2String("Entered stay_on; ");
-            led_on();
-            Idle();
-            //Disp2String("Left stay_on; ");
-        }
-        
-        /*
-         * enter this loop only if blink_rate != 0 due to the state machine
-         * 
-         * break out of this loop if the state changes
-         */
-        while (blink_rate != 0) {
-            delay_ms(blink_rate);
-            led_toggle();
-        }
-        
-/*#ifdef TESTSEND
-        XmitUART2('3',5);
-        XmitUART2('\n',5);
-        XmitUART2('\b',5);
-        
-        for (slow = 0; slow < 1000; slow++) {
-            
-        }
-#endif*/
-        
-/*#ifndef TESTSEND
-        Disp2String("Enter a character (hit enter to receive): ");
-        received = RecvUartChar();
-        Disp2String("\r\n you entered ");
-        XmitUART2(received,1);
-        XmitUART2('\r',1);
-        XmitUART2('\n',1);
-        
-        
-#endif*/
-        
-    }
+    while(1) primary_loop();
     
     return 0;
 }
@@ -255,11 +133,37 @@ void __attribute__((interrupt, no_auto_psv)) _CNInterrupt(void){
     PB_current_state = (BUTTON1) | (BUTTON2 << 1) | (BUTTON3 << 2);
     
     if (current_state & 0b10000) {
-        if (PB_last_state == 0b001 && PB_current_state == 0b000) current_state = (current_state == FASTMODE_PB1) ? FASTMODE : FASTMODE_PB1;
-        else if (PB_last_state == 0b010 && PB_current_state == 0b000) current_state = (current_state == FASTMODE_PB2) ? FASTMODE : FASTMODE_PB2;
-        else if (PB_last_state == 0b100 && PB_current_state == 0b000) current_state = (current_state == FASTMODE_PB3) ? FASTMODE : FASTMODE_PB3;
+        if (PB_last_state == 0b001 && PB_current_state == 0b000) 
+            current_state = (current_state == FASTMODE_PB1 || stay_on == 1) ? FASTMODE : FASTMODE_PB1;
+        else if (PB_last_state == 0b010 && PB_current_state == 0b000) 
+            current_state = (current_state == FASTMODE_PB2  || stay_on == 1) ? FASTMODE : FASTMODE_PB2;
+        else if (PB_last_state == 0b100 && PB_current_state == 0b000) 
+            current_state = (current_state == FASTMODE_PB3  || stay_on == 1) ? FASTMODE : FASTMODE_PB3;
+        else if (PB_current_state == 0b011) current_state = FASTMODE_COMB12;
+        else if (PB_current_state == 0b101) current_state = FASTMODE_COMB13;
+        else if (PB_current_state == 0b110) current_state = FASTMODE_COMB23;
+        else if (PB_current_state == 0b111) {
+            current_state = PROGMODE;
+        }
+    } else if (current_state & 0b100000) {
+        if (current_state == PROGMODE_PB3) {
+            U2STAbits.UTXEN = 1;
+            while(U2STAbits.UTXBF==1);
+            U2TXREG='\b';
+            while(U2STAbits.TRMT==0);
+        }
+        if (PB_last_state == 0b001 && PB_current_state == 0b000) 
+            current_state = (current_state == PROGMODE_PB1) ? PROGMODE : PROGMODE_PB1;
+        else if (PB_last_state == 0b010 && PB_current_state == 0b000) 
+            current_state = (current_state == PROGMODE_PB2) ? PROGMODE : PROGMODE_PB2;
+        else if (PB_last_state == 0b100 && PB_current_state == 0b000) 
+            current_state = (current_state == PROGMODE_PB3) ? PROGMODE : PROGMODE_PB3;
+        else if (PB_current_state == 0b111) {
+            current_state = FASTMODE; 
+        }
     }
     
+    //stay_on = 0;
     blink_rate = 0;
     
     PB_event = 1;
