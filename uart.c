@@ -96,13 +96,13 @@ void XmitUART2(char CharNum, unsigned int repeatNo)
 	U2STAbits.UTXEN = 1;
 	while(repeatNo!=0) 
 	{
-		while(U2STAbits.UTXBF==1)   // We loop here because.... 
+		while(U2STAbits.UTXBF==1)   // Wait until transmit buffer is not full before proceeding 
 		{
 		}	
-		U2TXREG=CharNum;            // We put XXXXXX here because .....
+		U2TXREG=CharNum;            // Place desired character in transmit register
 		repeatNo--;
 	}
-	while(U2STAbits.TRMT==0)        // We check XXXXX because .........
+	while(U2STAbits.TRMT==0)        // Wait until transmit buffer has been emptied
 	{
 	}
 

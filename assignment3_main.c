@@ -132,6 +132,8 @@ void __attribute__((interrupt, no_auto_psv)) _CNInterrupt(void){
     PB_last_state = PB_current_state;
     PB_current_state = (BUTTON1) | (BUTTON2 << 1) | (BUTTON3 << 2);
     
+    // assign new state based on button inputs
+    // use nested 'if' statements to maximize performance
     if (current_state & 0b10000) {
         if (PB_last_state == 0b001 && PB_current_state == 0b000) 
             current_state = (current_state == FASTMODE_PB1 || stay_on == 1) ? FASTMODE : FASTMODE_PB1;
@@ -163,8 +165,7 @@ void __attribute__((interrupt, no_auto_psv)) _CNInterrupt(void){
         }
     }
     
-    //stay_on = 0;
-    blink_rate = 0;
+    blink_rate = 0; // set blink_rate = 0 so that main() knows it needs to get a new blink_rate
     
     PB_event = 1;
 }
